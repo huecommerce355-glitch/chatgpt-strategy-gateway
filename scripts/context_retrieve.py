@@ -17,7 +17,7 @@ def item(path, priority, full=False):
     return result
 
 def retrieve(project_id, vault, full=False, recent=3):
-    root = Path(vault).expanduser(); result = {"p0": [], "p1": [], "p2": [], "p3": []}
+    root = Path(vault).expanduser() / "AI-Vault"; result = {"p0": [], "p1": [], "p2": [], "p3": []}
     project = root / "Projects" / project_id / "project-summary.md"
     if project.exists(): result["p0"].append(item(project, "P0", full))
     decisions = root / "Decisions"
@@ -32,7 +32,7 @@ def retrieve(project_id, vault, full=False, recent=3):
     lessons = root / "Knowledge" / "lessons-learned.md"
     if lessons.exists(): result["p2"].append(item(lessons, "P2", full))
     for category in ("Goals", "Plans", "Options", "Reviews"):
-        archive = root / "AI-Vault" / "Strategy" / category
+        archive = root / "Strategy" / category
         if archive.exists(): result["p3"].extend(filter(None, (item(p, "P3", full) for p in sorted(archive.rglob("*.md")))))
     for key in result: result[key] = [x for x in result[key] if x]
     parts = [f"{key.upper()}: " + "; ".join(x["summary"] for x in result[key]) for key in ("p0", "p1", "p2", "p3") if result[key]]
@@ -41,7 +41,7 @@ def retrieve(project_id, vault, full=False, recent=3):
 def read_knowledge(payload, vault):
     requested = payload.get("path") or payload.get("document")
     if not requested: raise ValueError("path is required")
-    root = Path(vault).expanduser().resolve(); path = (root / requested).resolve()
+    root = (Path(vault).expanduser() / "AI-Vault").resolve(); path = (root / requested).resolve()
     if root not in path.parents and path != root: raise ValueError("document outside vault")
     if not path.is_file(): return {"ok": False, "error": {"code": "ERR-STR-005", "message": "document not found"}}
     body = path.read_text(encoding="utf-8")
