@@ -1,7 +1,7 @@
 ---
 name: chatgpt-strategy-gateway
 description: "Strategic boundary for ChatGPT-to-Hermes strategy tasks: context retrieval, ADR proposals, and orchestrated handoff."
-version: 1.1.0
+version: 1.2.0
 author: Hermes Agent
 license: MIT
 platforms: ["linux", "macos"]
@@ -38,7 +38,7 @@ ChatGPT → chatgpt-strategy-gateway → registry / knowledge / orchestrator
 
 协议为 `{name: "HACP", version: "1.0"}`，消息类型前缀必须是 `strategy.`。
 
-## HTTP Transport (v1.1)
+## HTTP Transport (v1.2)
 
 HTTP 适配层与 HACP 协议层分离，消息信封保持不变。`GET /health` 无需认证；
 `POST /strategy/context`、`/strategy/knowledge`、`/strategy/adr` 和
@@ -47,6 +47,14 @@ HTTP 适配层与 HACP 协议层分离，消息信封保持不变。`GET /health
 端点匹配的 `strategy.*` 类型可被转发，非 strategy 消息返回 403 和
 `ERR-STR-008`。详见 [HTTP transport](references/http_transport.md) 与
 [OpenAPI](references/openapi.yaml)。
+
+### Trace Passthrough
+
+`strategy.*` 请求可在 `payload` 或 HACP 信封顶层携带 `request_id` 和/或
+`trace_id`。payload 字段优先，信封级字段作为兼容回退。HTTP adapter 会将
+这些字段传给 context、knowledge、ADR 和 handoff 业务脚本；handoff 生成的
+`task.dispatch.payload` 保留相同字段，HTTP 响应也回显请求级字段。没有 trace
+字段的旧请求保持原有输出结构。
 
 ## Four Approved Corrections
 

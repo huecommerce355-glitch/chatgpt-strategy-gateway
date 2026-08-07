@@ -1,8 +1,17 @@
 # HTTP Transport
 
-v1.1 adds a thin HTTPS-facing adapter. HACP envelopes and the existing
+v1.2 adds trace metadata passthrough to the thin HTTPS-facing adapter. HACP envelopes and the existing
 `strategy.*` protocol do not change; HTTP only supplies routing, authentication,
 JSON decoding, and response status mapping.
+
+## Trace passthrough
+
+`request_id` and `trace_id` may be supplied in the request `payload` or at the
+HACP envelope level. Payload values take precedence when the same field appears
+in both locations. The adapter passes the metadata to the selected business
+script. A handoff preserves it in the outgoing `task.dispatch.payload`, and
+successful HTTP responses echo it at the response top level. Requests without
+these fields retain the v1.1 response and dispatch shapes.
 
 ## Endpoints
 

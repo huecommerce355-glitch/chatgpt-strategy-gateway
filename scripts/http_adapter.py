@@ -28,9 +28,12 @@ def _error(code: str, message: str) -> Dict[str, str]:
 
 
 def _envelope(http_status: int, result: Optional[Dict[str, Any]] = None,
-              error: Optional[Dict[str, str]] = None) -> Tuple[int, Dict[str, Any]]:
+              error: Optional[Dict[str, str]] = None,
+              request_id: Any = None, trace_id: Any = None) -> Tuple[int, Dict[str, Any]]:
     body: Dict[str, Any] = {"status": "ok" if error is None else "error"}
     body["result" if error is None else "error"] = result if error is None else error
+    if request_id is not None: body["request_id"] = request_id
+    if trace_id is not None: body["trace_id"] = trace_id
     return http_status, body
 
 
@@ -51,6 +54,16 @@ def _authenticate(headers: Mapping[str, str], payload: Mapping[str, Any]) -> Opt
     if supplied != configured:
         return _envelope(403, error=_error("ERR-STR-008", "invalid API key"))
     return None
+
+
+def _trace_fields(envelope: Mapping[str, Any], payload: Mapping[str, Any]) -> Dict[str, Any]:
+    """Read trace metadata from payload first, then from the HACP envelope."""
+    fields: Dict[str, Any] = {}
+    for key in ("request_id", "trace_id"):
+        value = payload[key] if key in payload else envelope.get(key)
+        if value is not None:
+            fields[key] = value
+    return fields
 
 
 def handle_request(method: str, path: str, headers: Optional[Mapping[str, str]] = None,
@@ -79,23 +92,25 @@ def handle_request(method: str, path: str, headers: Optional[Mapping[str, str]] 
     if validation["type"] != ACTION_TYPES[action]:
         return _envelope(400, error=_error("ERR-STR-001", "message type does not match endpoint"))
 
-    payload = body["payload"]
+    payload = dict(body["payload"])
+    trace = _trace_fields(body, payload)
+    payload.update(trace)
     try:
         if action == "context":
             if not payload.get("project_id"):
                 return _envelope(400, error=_error("ERR-STR-002", "project_id is required"))
-            result = retrieve(payload["project_id"], _vault(payload), bool(payload.get("full")), int(payload.get("recent", 3)))
+            result = retrieve(payload["project_id"], _vault(payload), bool(payload.get("full")), int(payload.get("recent", 3)), **trace)
         elif action == "knowledge":
-            result = read_knowledge(payload, _vault(payload))
+            result = read_knowledge(payload, _vault(payload), **trace)
         elif action == "adr":
-            result = propose(payload, _vault(payload))
+            result = propose(payload, _vault(payload), **trace)
         else:
-            result = handoff(payload)
+            result = handoff(payload, **trace)
     except (OSError, ValueError, TypeError) as exc:
         return _envelope(400, error=_error("ERR-STR-003", str(exc)))
     if not result.get("ok", True):
         return _envelope(400, error=result.get("error", _error("ERR-STR-003", "strategy operation failed")))
-    return _envelope(200, result=result)
+    return _envelope(200, result=result, **trace)
 
 
 class StrategyRequestHandler(BaseHTTPRequestHandler):
