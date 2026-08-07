@@ -1,7 +1,7 @@
 ---
 name: chatgpt-strategy-gateway
 description: "Strategic boundary for ChatGPT-to-Hermes strategy tasks: context retrieval, ADR proposals, and orchestrated handoff."
-version: 1.0.0
+version: 1.1.0
 author: Hermes Agent
 license: MIT
 platforms: ["linux", "macos"]
@@ -37,6 +37,16 @@ ChatGPT → chatgpt-strategy-gateway → registry / knowledge / orchestrator
 ```
 
 协议为 `{name: "HACP", version: "1.0"}`，消息类型前缀必须是 `strategy.`。
+
+## HTTP Transport (v1.1)
+
+HTTP 适配层与 HACP 协议层分离，消息信封保持不变。`GET /health` 无需认证；
+`POST /strategy/context`、`/strategy/knowledge`、`/strategy/adr` 和
+`/strategy/handoff` 使用 `X-API-Key`（或 payload 中的 `api_key`）认证。服务端
+从 `STRATEGY_GATEWAY_API_KEY` 读取密钥，未配置时受保护请求返回 503。只有与
+端点匹配的 `strategy.*` 类型可被转发，非 strategy 消息返回 403 和
+`ERR-STR-008`。详见 [HTTP transport](references/http_transport.md) 与
+[OpenAPI](references/openapi.yaml)。
 
 ## Four Approved Corrections
 

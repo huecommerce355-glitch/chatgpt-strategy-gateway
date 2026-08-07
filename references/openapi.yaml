@@ -1,0 +1,79 @@
+openapi: 3.0.3
+info:
+  title: ChatGPT Strategy Gateway HTTP Transport
+  version: 1.1.0
+  description: HTTPS adapter for the HACP strategy protocol.
+servers:
+  - url: https://strategy-gateway.example.com
+paths:
+  /health:
+    get:
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: Gateway is available
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Response'}
+  /strategy/context:
+    post:
+      summary: Retrieve strategic context
+      security: [{ApiKeyAuth: []}]
+      requestBody: {$ref: '#/components/requestBodies/StrategyContextRequest'}
+      responses: {$ref: '#/components/responses/StrategyResponse'}
+  /strategy/adr:
+    post:
+      summary: Propose an ADR
+      security: [{ApiKeyAuth: []}]
+      requestBody: {$ref: '#/components/requestBodies/StrategyAdrRequest'}
+      responses: {$ref: '#/components/responses/StrategyResponse'}
+  /strategy/handoff:
+    post:
+      summary: Hand off a strategy task
+      security: [{ApiKeyAuth: []}]
+      requestBody: {$ref: '#/components/requestBodies/StrategyHandoffRequest'}
+      responses: {$ref: '#/components/responses/StrategyResponse'}
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  requestBodies:
+    StrategyContextRequest: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/StrategyEnvelope'}}}}
+    StrategyAdrRequest: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/StrategyEnvelope'}}}}
+    StrategyHandoffRequest: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/StrategyEnvelope'}}}}
+  responses:
+    StrategyResponse:
+      description: Strategy result or ERR-STR error
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Response'}
+  schemas:
+    Protocol:
+      type: object
+      required: [name, version]
+      properties:
+        name: {type: string, enum: [HACP]}
+        version: {type: string, enum: ['1.0']}
+    StrategyEnvelope:
+      type: object
+      required: [protocol, type, payload]
+      properties:
+        protocol: {$ref: '#/components/schemas/Protocol'}
+        type: {type: string, pattern: '^strategy\\.'}
+        payload: {type: object, additionalProperties: true}
+        api_key: {type: string, writeOnly: true}
+    Response:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, enum: [ok, error]}
+        result: {type: object, additionalProperties: true}
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: string, pattern: '^ERR-STR-'}
+            message: {type: string}
