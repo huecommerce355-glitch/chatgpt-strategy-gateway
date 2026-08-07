@@ -29,7 +29,7 @@ def _update_index(root, entry):
     os.chmod(path, 0o600)
     return {"ok": True}
 
-def propose(payload, vault):
+def propose(payload, vault, trace_id=None, request_id=None, session_id=None):
     status = payload.get("status", "proposed")
     if status != "proposed": return {"ok": False, "error": {"code": "ERR-STR-008", "message": "gateway may only create proposed ADRs"}}
     title = payload.get("title") or payload.get("decision")
@@ -53,7 +53,10 @@ def propose(payload, vault):
     indexed = _update_index(root, entry)
     if not indexed["ok"]:
         return {"ok": False, "error": {"code": indexed["error_code"], "message": indexed["message"]}}
-    return {"ok": True, "adr_number": number, "path": str(path), "status": "proposed"}
+    result = {"ok": True, "adr_number": number, "path": str(path), "status": "proposed"}
+    for key, value in (("request_id", request_id), ("trace_id", trace_id), ("session_id", session_id)):
+        if value is not None: result[key] = value
+    return result
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--input", required=True); args = ap.parse_args()
     try:
