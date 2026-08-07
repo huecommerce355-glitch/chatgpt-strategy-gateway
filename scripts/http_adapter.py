@@ -29,11 +29,13 @@ def _error(code: str, message: str) -> Dict[str, str]:
 
 def _envelope(http_status: int, result: Optional[Dict[str, Any]] = None,
               error: Optional[Dict[str, str]] = None,
-              request_id: Any = None, trace_id: Any = None) -> Tuple[int, Dict[str, Any]]:
+              request_id: Any = None, trace_id: Any = None,
+              session_id: Any = None) -> Tuple[int, Dict[str, Any]]:
     body: Dict[str, Any] = {"status": "ok" if error is None else "error"}
     body["result" if error is None else "error"] = result if error is None else error
     if request_id is not None: body["request_id"] = request_id
     if trace_id is not None: body["trace_id"] = trace_id
+    if session_id is not None: body["session_id"] = session_id
     return http_status, body
 
 
@@ -57,13 +59,28 @@ def _authenticate(headers: Mapping[str, str], payload: Mapping[str, Any]) -> Opt
 
 
 def _trace_fields(envelope: Mapping[str, Any], payload: Mapping[str, Any]) -> Dict[str, Any]:
-    """Read trace metadata from payload first, then from the HACP envelope."""
+    """Read correlation metadata from payload first, then from the envelope."""
     fields: Dict[str, Any] = {}
-    for key in ("request_id", "trace_id"):
+    for key in ("request_id", "trace_id", "session_id"):
         value = payload[key] if key in payload else envelope.get(key)
         if value is not None:
             fields[key] = value
     return fields
+
+
+def _normalize_envelope(body: Mapping[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
+    """Normalize envelope member casing without changing HACP protocol values."""
+    normalized = {str(key).lower(): value for key, value in body.items()}
+    required = ("protocol", "type", "payload")
+    if any(key not in normalized for key in required):
+        return None, _error("ERR-STR-009", "invalid request envelope")
+    if isinstance(normalized["protocol"], dict):
+        normalized["protocol"] = {
+            str(key).lower(): value for key, value in normalized["protocol"].items()
+        }
+    if not isinstance(normalized["payload"], dict):
+        return None, _error("ERR-STR-009", "invalid request envelope")
+    return normalized, None
 
 
 def handle_request(method: str, path: str, headers: Optional[Mapping[str, str]] = None,
@@ -79,7 +96,12 @@ def handle_request(method: str, path: str, headers: Optional[Mapping[str, str]] 
     if action not in ACTION_TYPES:
         return _envelope(404, error=_error("ERR-STR-007", "endpoint not found"))
     if not isinstance(body, dict):
-        return _envelope(400, error=_error("ERR-STR-007", "request body must be a JSON object"))
+        return _envelope(400, error=_error("ERR-STR-009", "invalid request envelope"))
+
+    body, envelope_error = _normalize_envelope(body)
+    if envelope_error is not None:
+        return _envelope(400, error=envelope_error)
+    assert body is not None
 
     auth_error = _authenticate(headers, body)
     if auth_error is not None:

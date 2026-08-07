@@ -1,17 +1,26 @@
 # HTTP Transport
 
-v1.2 adds trace metadata passthrough to the thin HTTPS-facing adapter. HACP envelopes and the existing
+v1.3 adds session metadata and envelope normalization to the thin HTTPS-facing adapter. HACP envelopes and the existing
 `strategy.*` protocol do not change; HTTP only supplies routing, authentication,
 JSON decoding, and response status mapping.
 
+## Session and envelope normalization
+
+`session_id` may be supplied at the HACP envelope level or in `payload`; the
+payload value takes precedence. `request_id`, `trace_id`, and `session_id` are
+passed to business scripts and echoed at the response top level when present.
+Envelope member names are normalized case-insensitively for `protocol`, `type`,
+`payload`, and metadata. Missing required envelope members return HTTP 400 with
+`ERR-STR-009`. Protocol values remain strict: `{name: HACP, version: "1.0"}`.
+
 ## Trace passthrough
 
-`request_id` and `trace_id` may be supplied in the request `payload` or at the
+`request_id`, `trace_id`, and `session_id` may be supplied in the request `payload` or at the
 HACP envelope level. Payload values take precedence when the same field appears
 in both locations. The adapter passes the metadata to the selected business
 script. A handoff preserves it in the outgoing `task.dispatch.payload`, and
 successful HTTP responses echo it at the response top level. Requests without
-these fields retain the v1.1 response and dispatch shapes.
+these fields retain the pre-v1.3 response and dispatch shapes.
 
 ## Endpoints
 

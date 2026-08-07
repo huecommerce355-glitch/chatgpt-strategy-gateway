@@ -16,7 +16,7 @@ def item(path, priority, full=False):
     if full: result["body"] = body
     return result
 
-def retrieve(project_id, vault, full=False, recent=3):
+def retrieve(project_id, vault, full=False, recent=3, trace_id=None, request_id=None, session_id=None):
     root = Path(vault).expanduser() / "AI-Vault"; result = {"p0": [], "p1": [], "p2": [], "p3": []}
     project = root / "Projects" / project_id / "project-summary.md"
     if project.exists(): result["p0"].append(item(project, "P0", full))
@@ -36,9 +36,12 @@ def retrieve(project_id, vault, full=False, recent=3):
         if archive.exists(): result["p3"].extend(filter(None, (item(p, "P3", full) for p in sorted(archive.rglob("*.md")))))
     for key in result: result[key] = [x for x in result[key] if x]
     parts = [f"{key.upper()}: " + "; ".join(x["summary"] for x in result[key]) for key in ("p0", "p1", "p2", "p3") if result[key]]
-    return {"priorities": result, "context_summary": " | ".join(parts)}
+    output = {"priorities": result, "context_summary": " | ".join(parts)}
+    for key, value in (("request_id", request_id), ("trace_id", trace_id), ("session_id", session_id)):
+        if value is not None: output[key] = value
+    return output
 
-def read_knowledge(payload, vault):
+def read_knowledge(payload, vault, trace_id=None, request_id=None, session_id=None):
     requested = payload.get("path") or payload.get("document")
     if not requested: raise ValueError("path is required")
     root = (Path(vault).expanduser() / "AI-Vault").resolve(); path = (root / requested).resolve()
@@ -47,6 +50,8 @@ def read_knowledge(payload, vault):
     body = path.read_text(encoding="utf-8")
     result = {"ok": True, "path": str(path), "summary": summary(body, False)}
     if payload.get("full"): result["body"] = body
+    for key, value in (("request_id", request_id), ("trace_id", trace_id), ("session_id", session_id)):
+        if value is not None: result[key] = value
     return result
 
 def main():

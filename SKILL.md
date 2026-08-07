@@ -1,7 +1,7 @@
 ---
 name: chatgpt-strategy-gateway
 description: "Strategic boundary for ChatGPT-to-Hermes strategy tasks: context retrieval, ADR proposals, and orchestrated handoff."
-version: 1.2.0
+version: 1.3.0
 author: Hermes Agent
 license: MIT
 platforms: ["linux", "macos"]
@@ -38,7 +38,7 @@ ChatGPT → chatgpt-strategy-gateway → registry / knowledge / orchestrator
 
 协议为 `{name: "HACP", version: "1.0"}`，消息类型前缀必须是 `strategy.`。
 
-## HTTP Transport (v1.2)
+## HTTP Transport (v1.3)
 
 HTTP 适配层与 HACP 协议层分离，消息信封保持不变。`GET /health` 无需认证；
 `POST /strategy/context`、`/strategy/knowledge`、`/strategy/adr` 和
@@ -48,10 +48,18 @@ HTTP 适配层与 HACP 协议层分离，消息信封保持不变。`GET /health
 `ERR-STR-008`。详见 [HTTP transport](references/http_transport.md) 与
 [OpenAPI](references/openapi.yaml)。
 
+### Session & Envelope
+
+请求支持 `session_id`，可放在 HACP 信封顶层或 `payload` 中；payload 值优先。
+`request_id`、`trace_id` 和 `session_id` 均按相同规则透传，HTTP 响应会回显实际值。
+信封字段名（`protocol`、`type`、`payload` 及元数据）可使用不一致的大小写，适配层会
+规范化字段名；缺少必需信封字段返回 `ERR-STR-009`。协议值仍必须严格为
+`{name: HACP, version: "1.0"}`，消息类型仍必须是允许的 `strategy.*` 类型。
+
 ### Trace Passthrough
 
 `strategy.*` 请求可在 `payload` 或 HACP 信封顶层携带 `request_id` 和/或
-`trace_id`。payload 字段优先，信封级字段作为兼容回退。HTTP adapter 会将
+`trace_id` 和/或 `session_id`。payload 字段优先，信封级字段作为兼容回退。HTTP adapter 会将
 这些字段传给 context、knowledge、ADR 和 handoff 业务脚本；handoff 生成的
 `task.dispatch.payload` 保留相同字段，HTTP 响应也回显请求级字段。没有 trace
 字段的旧请求保持原有输出结构。
@@ -75,6 +83,7 @@ HTTP 适配层与 HACP 协议层分离，消息信封保持不变。`GET /health
 | ERR-STR-006 | 转交失败 |
 | ERR-STR-007 | 输入无效 |
 | ERR-STR-008 | 权限越界（含非 proposed ADR） |
+| ERR-STR-009 | 信封无效 |
 
 ## Common Pitfalls
 
