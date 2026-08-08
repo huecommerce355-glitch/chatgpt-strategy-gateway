@@ -11,7 +11,7 @@ def _next_adr(directory):
     numbers = [int(m.group(1)) for p in directory.glob("ADR-*.md") if (m := re.match(r"ADR-(\d+)-", p.name))]
     return max(numbers, default=0) + 1
 
-def _update_index(root, entry):
+def _update_index(root, entry, status=None):
     path = root / ".knowledge-index.yaml"
     data = {"last_indexed": None, "documents": []}
     if path.exists():
@@ -22,8 +22,11 @@ def _update_index(root, entry):
             data.update(loaded)
         except (ValueError, json.JSONDecodeError):
             return {"ok": False, "error_code": "ERR-KNG-006", "message": "knowledge index is damaged"}
-    data["documents"] = [item for item in data["documents"] if item.get("path") != entry["path"]]
-    data["documents"].append(entry)
+    indexed_entry = dict(entry)
+    if status is not None:
+        indexed_entry["status"] = status
+    data["documents"] = [item for item in data["documents"] if item.get("path") != indexed_entry["path"]]
+    data["documents"].append(indexed_entry)
     data["last_indexed"] = datetime.now(timezone.utc).isoformat()
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.chmod(path, 0o600)
@@ -46,10 +49,13 @@ def propose(payload, vault, trace_id=None, request_id=None, session_id=None):
         "path": str(path.relative_to(root)),
         "title": title,
         "type": "decision-record",
+        "status": "proposed",
         "project_id": payload.get("project_id", ""),
         "tags": payload.get("tags", []),
         "date": date.today().isoformat(),
     }
+    if trace_id is not None:
+        entry["trace_id"] = trace_id
     indexed = _update_index(root, entry)
     if not indexed["ok"]:
         return {"ok": False, "error": {"code": indexed["error_code"], "message": indexed["message"]}}

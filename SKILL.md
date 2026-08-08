@@ -1,7 +1,7 @@
 ---
 name: chatgpt-strategy-gateway
 description: "Strategic boundary for ChatGPT-to-Hermes strategy tasks: context retrieval, ADR proposals, and orchestrated handoff."
-version: 1.3.0
+version: 1.3.1
 author: Hermes Agent
 license: MIT
 platforms: ["linux", "macos"]
@@ -37,6 +37,13 @@ ChatGPT → chatgpt-strategy-gateway → registry / knowledge / orchestrator
 ```
 
 协议为 `{name: "HACP", version: "1.0"}`，消息类型前缀必须是 `strategy.`。
+
+### Index Status
+
+ADR 写入 `.knowledge-index.yaml` 时，entry 必须包含 `path`、`title`、`type: decision-record`
+和与 ADR 文件一致的 `status`。新提议使用 `status: proposed`；人工或编排层接受 ADR
+时，索引更新必须同步为 `status: accepted`。旧索引 entry 可以没有 `status`，读取和搜索
+必须保持兼容；重写索引时只替换目标 ADR 的 entry，不强制修改其他 legacy entry。
 
 ## HTTP Transport (v1.3)
 
